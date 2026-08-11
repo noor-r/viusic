@@ -1,6 +1,6 @@
 # Scoring Desk — Video Content Analyzer → Music Recommender
 
-Upload a video. It gets broken into scenes, each scene is read by Kimi's
+Upload a video. It gets broken into scenes, each scene is read by Mistral's
 vision model, and the results are synthesized into an overall emotional arc
 and pacing profile. That profile then drives two music outputs:
 
@@ -21,15 +21,15 @@ ffmpeg: probe metadata, detect scene cuts, extract 1 frame per scene,
         extract audio track → estimate tempo/loudness/energy
    │
    ▼
-Kimi vision: analyze each scene frame → {setting, action, mood,
+Mistral vision: analyze each scene frame → {setting, action, mood,
                visual_energy, color_tone}
    │
    ▼
-Kimi (2nd pass): synthesize all scenes + audio features → overall theme,
+Mistral (2nd pass): synthesize all scenes + audio features → overall theme,
                     emotional arc, pacing, energy curve, transition moments
    │
    ▼
-Kimi (3rd pass): overall + scene analysis → music recommendation:
+Mistral (3rd pass): overall + scene analysis → music recommendation:
                     - YouTube search queries
                     - style tags / reference styles
                     - Suno/Udio prompt + section cue sheet
@@ -55,7 +55,7 @@ pip install -r requirements.txt
 You also need `ffmpeg` and `ffprobe` on PATH (already present in most
 environments; on Ubuntu: `apt install ffmpeg`).
 
-Set your Kimi API key:
+Set your Mistral API key:
 
 ```bash
 export MISTRAL_API_KEY=9W...
