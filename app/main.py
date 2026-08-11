@@ -7,7 +7,7 @@ AI generation prompt).
 Run with:
     uvicorn app.main:app --reload --port 8000
 
-Requires KIMI_API_KEY in the environment.
+Requires one of KIMI_API_KEY, MISTRAL_API_KEY, or OPENAI_API_KEY in the environment.
 """
 
 import os
@@ -73,7 +73,7 @@ def normalize_api_base_url(raw_url: str | None) -> str:
 
     parsed = urlparse(base_url)
     if not parsed.scheme or not parsed.netloc:
-        raise ValueError("KIMI_API_BASE_URL must be a valid absolute URL.")
+        raise ValueError("API base URL must be a valid absolute URL.")
 
     if "api.kimi.com" in parsed.netloc:
         return DEFAULT_KIMI_BASE_URL
@@ -86,7 +86,7 @@ def normalize_api_base_url(raw_url: str | None) -> str:
 
     if not path.endswith("/v1"):
         raise ValueError(
-            "KIMI_API_BASE_URL must point to an OpenAI-compatible API root ending in /v1, not a specific route."
+            "API base URL must point to an OpenAI-compatible API root ending in /v1, not a specific route."
         )
 
     return f"{parsed.scheme}://{parsed.netloc}{path}"
@@ -134,7 +134,10 @@ def get_client() -> OpenAI:
         or ""
     ).strip()
     if not api_key:
-        raise HTTPException(status_code=500, detail="KIMI_API_KEY is not set on the server.")
+        raise HTTPException(
+            status_code=500,
+            detail="No API key is set on the server. Configure MISTRAL_API_KEY (or KIMI_API_KEY / OPENAI_API_KEY).",
+        )
 
     try:
         base_url = resolve_api_base_url()
@@ -356,14 +359,14 @@ async def analyze_video(file: UploadFile = File(...)):
     except AuthenticationError as e:
         raise HTTPException(
             status_code=500,
-            detail="Analysis failed: KIMI_API_KEY was rejected by the provider. Replace it with a valid Moonshot/Kimi API key and restart the server.",
+            detail="Analysis failed: API key was rejected by the provider. Verify the configured key for your provider and restart the server.",
         ) from e
     except APIStatusError as e:
         detail = str(e)
         if e.status_code == 404:
             detail = (
-                "Provider returned 404. Check KIMI_API_BASE_URL and use an OpenAI-compatible "
-                "Moonshot endpoint like https://api.moonshot.cn/v1."
+                "Provider returned 404. Check your API base URL and use an OpenAI-compatible "
+                "endpoint like https://api.mistral.ai/v1 or https://api.moonshot.cn/v1."
             )
         raise HTTPException(status_code=500, detail=f"Analysis failed: {detail}") from e
     except Exception as e:
