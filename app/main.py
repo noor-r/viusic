@@ -7,7 +7,7 @@ AI generation prompt).
 Run with:
     uvicorn app.main:app --reload --port 8000
 
-Requires one of KIMI_API_KEY, MISTRAL_API_KEY, or OPENAI_API_KEY in the environment.
+Requires MISTRAL_API_KEY in the environment.
 """
 
 import os
@@ -61,22 +61,18 @@ app.add_middleware(
 JOBS: dict = {}
 
 MAX_SCENES_FOR_VISION = int(os.environ.get("MAX_SCENES_FOR_VISION", "8"))
-DEFAULT_KIMI_BASE_URL = "https://api.moonshot.cn/v1"
 DEFAULT_MISTRAL_BASE_URL = "https://api.mistral.ai/v1"
 SUPPORTED_VIDEO_EXTENSIONS = {".mp4", ".mov", ".m4v", ".mkv", ".webm", ".avi", ".wmv", ".flv", ".mpeg", ".mpg", ".ogv"}
 
 
 def normalize_api_base_url(raw_url: str | None) -> str:
-    base_url = (raw_url or DEFAULT_KIMI_BASE_URL).strip().rstrip("/")
+    base_url = (raw_url or DEFAULT_MISTRAL_BASE_URL).strip().rstrip("/")
     if not base_url:
-        base_url = DEFAULT_KIMI_BASE_URL
+        base_url = DEFAULT_MISTRAL_BASE_URL
 
     parsed = urlparse(base_url)
     if not parsed.scheme or not parsed.netloc:
         raise ValueError("API base URL must be a valid absolute URL.")
-
-    if "api.kimi.com" in parsed.netloc:
-        return DEFAULT_KIMI_BASE_URL
 
     path = parsed.path.rstrip("/")
     if not path:
@@ -109,34 +105,21 @@ def is_supported_video_file(filename: str | None, mime_type: str | None = None) 
 
 def resolve_api_base_url() -> str:
     load_environment()
-    if os.environ.get("MISTRAL_API_KEY"):
-        mistral_base_url = (
-            os.environ.get("MISTRAL_BASE_URL")
-            or os.environ.get("MISTRAL_API_BASE_URL")
-            or DEFAULT_MISTRAL_BASE_URL
-        )
-        return normalize_api_base_url(mistral_base_url)
-
-    return normalize_api_base_url(
-        os.environ.get("KIMI_BASE_URL")
-        or os.environ.get("KIMI_API_BASE_URL")
-        or os.environ.get("OPENAI_BASE_URL")
-        or os.environ.get("OPENAI_API_BASE_URL")
+    mistral_base_url = (
+        os.environ.get("MISTRAL_BASE_URL")
+        or os.environ.get("MISTRAL_API_BASE_URL")
+        or DEFAULT_MISTRAL_BASE_URL
     )
+    return normalize_api_base_url(mistral_base_url)
 
 
 def get_client() -> OpenAI:
     load_environment()
-    api_key = (
-        os.environ.get("KIMI_API_KEY")
-        or os.environ.get("OPENAI_API_KEY")
-        or os.environ.get("MISTRAL_API_KEY")
-        or ""
-    ).strip()
+    api_key = (os.environ.get("MISTRAL_API_KEY") or "").strip()
     if not api_key:
         raise HTTPException(
             status_code=500,
-            detail="No API key is set on the server. Configure MISTRAL_API_KEY (or KIMI_API_KEY / OPENAI_API_KEY).",
+            detail="MISTRAL_API_KEY is not set on the server.",
         )
 
     try:
@@ -144,7 +127,7 @@ def get_client() -> OpenAI:
     except ValueError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
-    timeout_seconds = float(os.environ.get("KIMI_TIMEOUT_SECONDS", "60"))
+    timeout_seconds = float(os.environ.get("MISTRAL_TIMEOUT_SECONDS", "60"))
     return OpenAI(api_key=api_key, base_url=base_url, timeout=timeout_seconds, max_retries=0)
 
 
@@ -359,14 +342,14 @@ async def analyze_video(file: UploadFile = File(...)):
     except AuthenticationError as e:
         raise HTTPException(
             status_code=500,
-            detail="Analysis failed: API key was rejected by the provider. Verify the configured key for your provider and restart the server.",
+            detail="Analysis failed: MISTRAL_API_KEY was rejected by Mistral. Replace it with a valid key and restart the server.",
         ) from e
     except APIStatusError as e:
         detail = str(e)
         if e.status_code == 404:
             detail = (
-                "Provider returned 404. Check your API base URL and use an OpenAI-compatible "
-                "endpoint like https://api.mistral.ai/v1 or https://api.moonshot.cn/v1."
+                "Provider returned 404. Check MISTRAL_API_BASE_URL and use an OpenAI-compatible "
+                "Mistral endpoint like https://api.mistral.ai/v1."
             )
         raise HTTPException(status_code=500, detail=f"Analysis failed: {detail}") from e
     except Exception as e:

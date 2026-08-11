@@ -156,11 +156,52 @@ def normalize_downloader_results(payload: object) -> List[dict]:
     return normalized[:5]
 
 
+def _search_with_ytdlp(query: str) -> List[dict]:
+    """Fallback YouTube search using yt-dlp when the bundled downloader is unavailable."""
+    command = [
+        "yt-dlp",
+        f"ytsearch5:{query}",
+        "--dump-single-json",
+        "--flat-playlist",
+        "--no-warnings",
+        "--skip-download",
+    ]
+    completed = subprocess.run(command, capture_output=True, text=True, check=False, timeout=120)
+    if completed.returncode != 0:
+        stderr = (completed.stderr or completed.stdout).strip()
+        raise RuntimeError(stderr or f"yt-dlp search failed with exit code {completed.returncode}")
+
+    try:
+        payload = json.loads(completed.stdout.strip())
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"yt-dlp returned invalid JSON: {completed.stdout[:200]}") from exc
+
+    entries = payload.get("entries") if isinstance(payload, dict) else None
+    if not isinstance(entries, list):
+        return []
+
+    normalized: List[dict] = []
+    for item in entries:
+        if not isinstance(item, dict):
+            continue
+        normalized.append(
+            {
+                "title": item.get("title") or "Untitled",
+                "channel": item.get("uploader") or item.get("channel") or "YouTube",
+                "url": item.get("url") or item.get("webpage_url") or "",
+                "duration": _format_duration(item.get("duration")),
+                "thumbnail": item.get("thumbnail") or "",
+            }
+        )
+
+    return normalized[:5]
+
+
 def search_with_downloader(query: str) -> List[dict]:
     """Search YouTube via the bundled C# downloader executable."""
     downloader_path = _resolve_downloader_path()
     if not downloader_path:
-        raise RuntimeError("The downloader executable was not found. Build the downloader project first.")
+        return _search_with_ytdlp(query)
 
     command = [downloader_path, "search", query]
     if downloader_path.endswith(".dll"):
@@ -168,6 +209,8 @@ def search_with_downloader(query: str) -> List[dict]:
 
     completed = subprocess.run(command, capture_output=True, text=True, check=False, timeout=180)
     if completed.returncode != 0:
+        if os.environ.get("DOWNLOADER_FALLBACK_TO_YTDLP", "1").strip().lower() in {"1", "true", "yes"}:
+            return _search_with_ytdlp(query)
         stderr = (completed.stderr or completed.stdout).strip()
         raise RuntimeError(stderr or f"Downloader failed with exit code {completed.returncode}")
 
@@ -176,7 +219,12 @@ def search_with_downloader(query: str) -> List[dict]:
     except json.JSONDecodeError as exc:
         raise RuntimeError(f"Downloader returned invalid JSON: {completed.stdout[:200]}") from exc
 
-    return normalize_downloader_results(payload)
+    normalized = normalize_downloader_results(payload)
+    if normalized:
+        return normalized
+    if os.environ.get("DOWNLOADER_FALLBACK_TO_YTDLP", "1").strip().lower() in {"1", "true", "yes"}:
+        return _search_with_ytdlp(query)
+    return normalized
 
 
 def sanitize_filename(value: str) -> str:
