@@ -137,16 +137,40 @@ def _resolve_downloader_path() -> Optional[str]:
     return None
 
 
+def _resolve_dotnet_path() -> Optional[str]:
+    """Resolve dotnet CLI path even when PATH is not inherited by the process."""
+    resolved = shutil.which("dotnet")
+    if resolved:
+        return resolved
+
+    # Common Windows install location fallback.
+    windows_default = Path("C:/Program Files/dotnet/dotnet.exe")
+    if windows_default.exists():
+        return str(windows_default)
+
+    dotnet_root = os.environ.get("DOTNET_ROOT")
+    if dotnet_root:
+        candidate = Path(dotnet_root) / "dotnet.exe"
+        if candidate.exists():
+            return str(candidate)
+
+    return None
+
+
 def _build_downloader_if_needed() -> Optional[str]:
     """Attempt a local downloader build and return the resolved binary path."""
     base_dir = _downloader_base_dir()
     solution = base_dir / "YoutubeDownloader.slnx"
     project = base_dir / "SoundMind.Downloader" / "SoundMind.Downloader.csproj"
+    dotnet_path = _resolve_dotnet_path()
+
+    if not dotnet_path:
+        raise RuntimeError("dotnet CLI was not found. Install .NET SDK to build the downloader project.")
 
     for build_target in (solution, project):
         if not build_target.exists():
             continue
-        command = ["dotnet", "build", str(build_target), "-c", "Debug", "-v", "minimal"]
+        command = [dotnet_path, "build", str(build_target), "-c", "Debug", "-v", "minimal"]
         try:
             completed = subprocess.run(command, capture_output=True, text=True, check=False, timeout=900)
         except FileNotFoundError as exc:
@@ -264,7 +288,10 @@ def search_with_downloader(query: str) -> List[dict]:
 
     command = [downloader_path, "search", query]
     if downloader_path.endswith(".dll"):
-        command = ["dotnet", downloader_path, "search", query]
+        dotnet_path = _resolve_dotnet_path()
+        if not dotnet_path:
+            raise RuntimeError("dotnet CLI was not found. Install .NET SDK to run the downloader project.")
+        command = [dotnet_path, downloader_path, "search", query]
 
     completed = subprocess.run(command, capture_output=True, text=True, check=False, timeout=180)
     if completed.returncode != 0:
@@ -298,7 +325,10 @@ def download_media_with_downloader(video_url: str, output_path: str) -> str:
 
     command = [downloader_path, video_url, output_path]
     if downloader_path.endswith(".dll"):
-        command = ["dotnet", downloader_path, video_url, output_path]
+        dotnet_path = _resolve_dotnet_path()
+        if not dotnet_path:
+            raise RuntimeError("dotnet CLI was not found. Install .NET SDK to run the downloader project.")
+        command = [dotnet_path, downloader_path, video_url, output_path]
 
     completed = subprocess.run(command, capture_output=True, text=True, check=False, timeout=600)
     if completed.returncode != 0:
