@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: video-music-analyzer
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    autoDeploy: true
+    envVars:
+      - key: MISTRAL_API_KEY
+        sync: false
+      - key: MISTRAL_API_BASE_URL
+        value: https://api.mistral.ai/v1
+      - key: DOWNLOADER_FALLBACK_TO_YTDLP
+        value: "1"
+      - key: ATTACH_DOWNLOAD_AUDIO_ONLY
+        value: "1"
+      - key: MAX_SCENES_FOR_VISION
+        value: "8"

@@ -1,0 +1,14 @@
+.git
+.gitignore
+.venv
+__pycache__
+*.pyc
+
+frames
+uploads
+outputs
+
+downloader/**/bin
+downloader/**/obj
+
+tmp*

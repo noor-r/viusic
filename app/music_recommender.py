@@ -280,6 +280,55 @@ def _search_with_ytdlp(query: str) -> List[dict]:
     return normalized[:5]
 
 
+def _downloader_fallback_enabled() -> bool:
+    return os.environ.get("DOWNLOADER_FALLBACK_TO_YTDLP", "1").strip().lower() in {"1", "true", "yes"}
+
+
+def _download_media_with_ytdlp(video_url: str, output_path: str) -> str:
+    """Fallback media download using yt-dlp for deployment environments."""
+    output = Path(output_path)
+    output.parent.mkdir(parents=True, exist_ok=True)
+
+    output_ext = output.suffix.lower()
+    if output_ext == ".mp3":
+        command = [
+            "yt-dlp",
+            "--no-playlist",
+            "--extract-audio",
+            "--audio-format",
+            "mp3",
+            "--audio-quality",
+            "0",
+            "--output",
+            str(output),
+            video_url,
+        ]
+    elif output_ext == ".mp4":
+        command = [
+            "yt-dlp",
+            "--no-playlist",
+            "--format",
+            "bv*+ba/b",
+            "--merge-output-format",
+            "mp4",
+            "--output",
+            str(output),
+            video_url,
+        ]
+    else:
+        raise RuntimeError("yt-dlp fallback supports only .mp3 and .mp4 outputs.")
+
+    completed = subprocess.run(command, capture_output=True, text=True, check=False, timeout=900)
+    if completed.returncode != 0:
+        stderr = (completed.stderr or completed.stdout).strip()
+        raise RuntimeError(stderr or f"yt-dlp download failed with exit code {completed.returncode}")
+
+    if not output.exists():
+        raise RuntimeError("yt-dlp reported success but output file was not created.")
+
+    return str(output)
+
+
 def search_with_downloader(query: str) -> List[dict]:
     """Search YouTube via the bundled C# downloader executable."""
     downloader_path = _resolve_downloader_path()
@@ -295,7 +344,7 @@ def search_with_downloader(query: str) -> List[dict]:
 
     completed = subprocess.run(command, capture_output=True, text=True, check=False, timeout=180)
     if completed.returncode != 0:
-        if os.environ.get("DOWNLOADER_FALLBACK_TO_YTDLP", "1").strip().lower() in {"1", "true", "yes"}:
+        if _downloader_fallback_enabled():
             return _search_with_ytdlp(query)
         stderr = (completed.stderr or completed.stdout).strip()
         raise RuntimeError(stderr or f"Downloader failed with exit code {completed.returncode}")
@@ -308,7 +357,7 @@ def search_with_downloader(query: str) -> List[dict]:
     normalized = normalize_downloader_results(payload)
     if normalized:
         return normalized
-    if os.environ.get("DOWNLOADER_FALLBACK_TO_YTDLP", "1").strip().lower() in {"1", "true", "yes"}:
+    if _downloader_fallback_enabled():
         return _search_with_ytdlp(query)
     return normalized
 
@@ -321,7 +370,12 @@ def sanitize_filename(value: str) -> str:
 
 def download_media_with_downloader(video_url: str, output_path: str) -> str:
     """Download a YouTube URL to a media file using the bundled C# downloader."""
-    downloader_path = _ensure_downloader_path()
+    try:
+        downloader_path = _ensure_downloader_path()
+    except Exception:
+        if _downloader_fallback_enabled():
+            return _download_media_with_ytdlp(video_url, output_path)
+        raise
 
     command = [downloader_path, video_url, output_path]
     if downloader_path.endswith(".dll"):
@@ -332,6 +386,9 @@ def download_media_with_downloader(video_url: str, output_path: str) -> str:
 
     completed = subprocess.run(command, capture_output=True, text=True, check=False, timeout=600)
     if completed.returncode != 0:
+        if _downloader_fallback_enabled():
+            return _download_media_with_ytdlp(video_url, output_path)
+
         stderr = (completed.stderr or completed.stdout).strip()
         raise RuntimeError(stderr or f"Downloader failed with exit code {completed.returncode}")
 
