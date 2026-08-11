@@ -1,5 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
+    <PackageReference Include="AngleSharp" />
     <PackageReference Include="CSharpier.MsBuild" PrivateAssets="all" />
     <PackageReference Include="Gress" />
     <PackageReference Include="JsonExtensions" />
