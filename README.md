@@ -67,7 +67,7 @@ If YouTube blocks anonymous downloads/searches (HTTP 429, "Sign in to confirm yo
 
 ```bash
 # Preferred: reuse your logged-in browser session
-export YTDLP_COOKIES_FROM_BROWSER=chrome
+export YTDLP_COOKIES_B64=
 
 # Or use a Netscape-format cookies file
 export YTDLP_COOKIES_FILE=/absolute/path/to/youtube-cookies.txt
