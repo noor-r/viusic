@@ -96,24 +96,83 @@ Return ONLY the JSON object, no other text."""
 _youtube_search_fn: Optional[Callable[[str], List[dict]]] = None
 
 
-def _resolve_downloader_path() -> Optional[str]:
-    """Locate the bundled SoundMind downloader executable or DLL."""
-    base_dir = Path(__file__).resolve().parent.parent
+def _downloader_base_dir() -> Path:
+    return Path(__file__).resolve().parent.parent / "downloader"
+
+
+def _discover_downloader_artifact(base_dir: Path) -> Optional[str]:
+    project_dir = base_dir / "SoundMind.Downloader"
     candidates = [
-        base_dir / "downloader" / "SoundMind.Downloader" / "bin" / "Debug" / "net10.0" / "SoundMind.Downloader.exe",
-        base_dir / "downloader" / "SoundMind.Downloader" / "bin" / "Release" / "net10.0" / "SoundMind.Downloader.exe",
-        base_dir / "downloader" / "SoundMind.Downloader" / "bin" / "Debug" / "net10.0" / "SoundMind.Downloader.dll",
-        base_dir / "downloader" / "SoundMind.Downloader" / "bin" / "Release" / "net10.0" / "SoundMind.Downloader.dll",
+        project_dir / "bin" / "Debug" / "net10.0" / "SoundMind.Downloader.exe",
+        project_dir / "bin" / "Debug" / "net10.0" / "SoundMind.Downloader.dll",
+        project_dir / "bin" / "Release" / "net10.0" / "SoundMind.Downloader.exe",
+        project_dir / "bin" / "Release" / "net10.0" / "SoundMind.Downloader.dll",
     ]
     for candidate in candidates:
         if candidate.exists():
             return str(candidate)
+
+    # Support alternate target frameworks/configurations by scanning bin outputs.
+    discovered: list[Path] = []
+    for pattern in ("bin/**/SoundMind.Downloader.exe", "bin/**/SoundMind.Downloader.dll"):
+        discovered.extend(project_dir.glob(pattern))
+
+    if discovered:
+        best = max(discovered, key=lambda path: path.stat().st_mtime)
+        return str(best)
+
+    return None
+
+
+def _resolve_downloader_path() -> Optional[str]:
+    """Locate the bundled SoundMind downloader executable or DLL."""
+    bundled = _discover_downloader_artifact(_downloader_base_dir())
+    if bundled:
+        return bundled
 
     for name in ("SoundMind.Downloader.exe", "SoundMind.Downloader"):
         resolved = shutil.which(name)
         if resolved:
             return resolved
     return None
+
+
+def _build_downloader_if_needed() -> Optional[str]:
+    """Attempt a local downloader build and return the resolved binary path."""
+    base_dir = _downloader_base_dir()
+    solution = base_dir / "YoutubeDownloader.slnx"
+    project = base_dir / "SoundMind.Downloader" / "SoundMind.Downloader.csproj"
+
+    for build_target in (solution, project):
+        if not build_target.exists():
+            continue
+        command = ["dotnet", "build", str(build_target), "-c", "Debug", "-v", "minimal"]
+        try:
+            completed = subprocess.run(command, capture_output=True, text=True, check=False, timeout=900)
+        except FileNotFoundError as exc:
+            raise RuntimeError("dotnet CLI was not found. Install .NET SDK to build the downloader project.") from exc
+
+        if completed.returncode == 0:
+            resolved = _discover_downloader_artifact(base_dir)
+            if resolved:
+                return resolved
+
+    return None
+
+
+def _ensure_downloader_path() -> str:
+    downloader_path = _resolve_downloader_path()
+    if downloader_path:
+        return downloader_path
+
+    rebuilt_path = _build_downloader_if_needed()
+    if rebuilt_path:
+        return rebuilt_path
+
+    raise RuntimeError(
+        "The downloader executable was not found and an automatic build did not produce it. "
+        "Build the downloader project at downloader/YoutubeDownloader.slnx first."
+    )
 
 
 def _format_duration(seconds: Optional[float]) -> str:
@@ -235,9 +294,7 @@ def sanitize_filename(value: str) -> str:
 
 def download_media_with_downloader(video_url: str, output_path: str) -> str:
     """Download a YouTube URL to a media file using the bundled C# downloader."""
-    downloader_path = _resolve_downloader_path()
-    if not downloader_path:
-        raise RuntimeError("The downloader executable was not found. Build the downloader project first.")
+    downloader_path = _ensure_downloader_path()
 
     command = [downloader_path, video_url, output_path]
     if downloader_path.endswith(".dll"):
