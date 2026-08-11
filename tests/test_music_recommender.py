@@ -123,6 +123,30 @@ class DownloadFallbackTests(unittest.TestCase):
         self.assertIn("SoundMind.Downloader.exe", run_mock.call_args_list[0].args[0][0])
         self.assertIn("yt-dlp", run_mock.call_args_list[1].args[0][0])
 
+    @patch("app.music_recommender.subprocess.run")
+    @patch("app.music_recommender._ensure_downloader_path")
+    @patch("app.music_recommender.Path.exists")
+    def test_ytdlp_uses_browser_cookies_and_js_runtime_from_env(self, exists_mock, ensure_mock, run_mock):
+        ensure_mock.side_effect = RuntimeError("downloader missing")
+        exists_mock.return_value = True
+        run_mock.return_value = Mock(returncode=0, stderr="", stdout="")
+
+        with patch.dict(
+            os.environ,
+            {
+                "YTDLP_COOKIES_FROM_BROWSER": "chrome",
+                "YTDLP_JS_RUNTIMES": "node,deno",
+            },
+            clear=False,
+        ):
+            download_media_with_downloader("https://youtube.com/watch?v=abc123", "outputs/test_track.mp3")
+
+        command = run_mock.call_args.args[0]
+        self.assertIn("--cookies-from-browser", command)
+        self.assertIn("chrome", command)
+        self.assertIn("--js-runtimes", command)
+        self.assertIn("node,deno", command)
+
 
 if __name__ == "__main__":
     unittest.main()

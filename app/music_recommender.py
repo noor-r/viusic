@@ -243,6 +243,7 @@ def _search_with_ytdlp(query: str) -> List[dict]:
     """Fallback YouTube search using yt-dlp when the bundled downloader is unavailable."""
     command = [
         "yt-dlp",
+        *_build_ytdlp_common_args(),
         f"ytsearch5:{query}",
         "--dump-single-json",
         "--flat-playlist",
@@ -284,6 +285,38 @@ def _downloader_fallback_enabled() -> bool:
     return os.environ.get("DOWNLOADER_FALLBACK_TO_YTDLP", "1").strip().lower() in {"1", "true", "yes"}
 
 
+def _build_ytdlp_common_args() -> List[str]:
+    """Build shared yt-dlp args with optional anti-bot/auth settings from env vars."""
+    args = [
+        "--no-playlist",
+        "--retries",
+        os.environ.get("YTDLP_RETRIES", "5"),
+        "--fragment-retries",
+        os.environ.get("YTDLP_FRAGMENT_RETRIES", "5"),
+        "--extractor-retries",
+        os.environ.get("YTDLP_EXTRACTOR_RETRIES", "5"),
+        "--sleep-requests",
+        os.environ.get("YTDLP_SLEEP_REQUESTS", "1"),
+    ]
+
+    cookies_file = (os.environ.get("YTDLP_COOKIES_FILE") or "").strip()
+    cookies_from_browser = (os.environ.get("YTDLP_COOKIES_FROM_BROWSER") or "").strip()
+    if cookies_file:
+        args.extend(["--cookies", cookies_file])
+    elif cookies_from_browser:
+        args.extend(["--cookies-from-browser", cookies_from_browser])
+
+    js_runtimes = (os.environ.get("YTDLP_JS_RUNTIMES") or "").strip()
+    if js_runtimes:
+        args.extend(["--js-runtimes", js_runtimes])
+
+    user_agent = (os.environ.get("YTDLP_USER_AGENT") or "").strip()
+    if user_agent:
+        args.extend(["--user-agent", user_agent])
+
+    return args
+
+
 def _download_media_with_ytdlp(video_url: str, output_path: str) -> str:
     """Fallback media download using yt-dlp for deployment environments."""
     output = Path(output_path)
@@ -293,7 +326,7 @@ def _download_media_with_ytdlp(video_url: str, output_path: str) -> str:
     if output_ext == ".mp3":
         command = [
             "yt-dlp",
-            "--no-playlist",
+            *_build_ytdlp_common_args(),
             "--extract-audio",
             "--audio-format",
             "mp3",
@@ -306,7 +339,7 @@ def _download_media_with_ytdlp(video_url: str, output_path: str) -> str:
     elif output_ext == ".mp4":
         command = [
             "yt-dlp",
-            "--no-playlist",
+            *_build_ytdlp_common_args(),
             "--format",
             "bv*+ba/b",
             "--merge-output-format",

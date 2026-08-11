@@ -63,6 +63,28 @@ export MISTRAL_API_BASE_URL=https://api.mistral.ai/v1
 export MISTRAL_TIMEOUT_SECONDS=60
 ```
 
+If YouTube blocks anonymous downloads/searches (HTTP 429, "Sign in to confirm you're not a bot", or JS runtime warnings), configure the yt-dlp fallback with one of:
+
+```bash
+# Preferred: reuse your logged-in browser session
+export YTDLP_COOKIES_FROM_BROWSER=chrome
+
+# Or use a Netscape-format cookies file
+export YTDLP_COOKIES_FILE=/absolute/path/to/youtube-cookies.txt
+
+# Optional: enable additional JavaScript runtimes for YouTube extraction
+export YTDLP_JS_RUNTIMES=node,deno
+```
+
+Optional retry/throttle tuning:
+
+```bash
+export YTDLP_RETRIES=5
+export YTDLP_FRAGMENT_RETRIES=5
+export YTDLP_EXTRACTOR_RETRIES=5
+export YTDLP_SLEEP_REQUESTS=1
+```
+
 ## Run
 
 ```bash
