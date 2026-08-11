@@ -2,8 +2,10 @@ import unittest
 from unittest.mock import Mock, patch
 import os
 import base64
+from pathlib import Path
 
 from app.music_recommender import (
+    _build_ytdlp_common_args,
     build_music_search_queries,
     build_recommended_music_candidates,
     download_media_with_downloader,
@@ -194,6 +196,22 @@ class DownloadFallbackTests(unittest.TestCase):
 
         command = run_mock.call_args.args[0]
         self.assertIn("--cookies", command)
+
+    def test_skips_cookies_from_browser_when_cookie_db_missing(self):
+        with patch.dict(
+            os.environ,
+            {
+                "YTDLP_COOKIES_FILE": "",
+                "YTDLP_COOKIES_B64": "",
+                "YTDLP_COOKIES_FROM_BROWSER": "chrome",
+            },
+            clear=False,
+        ):
+            with patch("app.music_recommender.platform.system", return_value="Linux"):
+                with patch("app.music_recommender.Path.home", return_value=Path("/tmp/no-browser-profile")):
+                    args = _build_ytdlp_common_args()
+
+        self.assertNotIn("--cookies-from-browser", args)
 
 
 if __name__ == "__main__":

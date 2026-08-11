@@ -12,6 +12,7 @@ Wire your existing YouTube search feature into `set_youtube_search_function`.
 
 import json
 import os
+import platform
 import re
 import shutil
 import subprocess
@@ -311,6 +312,74 @@ def _resolve_ytdlp_cookies_file() -> str:
     return ""
 
 
+def _browser_cookie_db_available(cookies_from_browser: str) -> bool:
+    """Best-effort check for known browser cookie DB paths before enabling browser-cookie mode."""
+    browser = (cookies_from_browser or "").split(":", 1)[0].strip().lower()
+    if not browser:
+        return False
+
+    system_name = platform.system().lower()
+    home = Path.home()
+    candidates: list[Path] = []
+
+    if browser == "chrome":
+        if system_name == "windows":
+            local_app_data = Path(os.environ.get("LOCALAPPDATA") or "")
+            if local_app_data:
+                base = local_app_data / "Google" / "Chrome" / "User Data" / "Default"
+                candidates = [base / "Cookies", base / "Network" / "Cookies"]
+        elif system_name == "darwin":
+            base = home / "Library" / "Application Support" / "Google" / "Chrome" / "Default"
+            candidates = [base / "Cookies", base / "Network" / "Cookies"]
+        else:
+            base = home / ".config" / "google-chrome" / "Default"
+            candidates = [base / "Cookies", base / "Network" / "Cookies"]
+    elif browser == "chromium":
+        if system_name == "windows":
+            local_app_data = Path(os.environ.get("LOCALAPPDATA") or "")
+            if local_app_data:
+                base = local_app_data / "Chromium" / "User Data" / "Default"
+                candidates = [base / "Cookies", base / "Network" / "Cookies"]
+        elif system_name == "darwin":
+            base = home / "Library" / "Application Support" / "Chromium" / "Default"
+            candidates = [base / "Cookies", base / "Network" / "Cookies"]
+        else:
+            base = home / ".config" / "chromium" / "Default"
+            candidates = [base / "Cookies", base / "Network" / "Cookies"]
+    elif browser == "edge":
+        if system_name == "windows":
+            local_app_data = Path(os.environ.get("LOCALAPPDATA") or "")
+            if local_app_data:
+                base = local_app_data / "Microsoft" / "Edge" / "User Data" / "Default"
+                candidates = [base / "Cookies", base / "Network" / "Cookies"]
+        elif system_name == "darwin":
+            base = home / "Library" / "Application Support" / "Microsoft Edge" / "Default"
+            candidates = [base / "Cookies", base / "Network" / "Cookies"]
+        else:
+            base = home / ".config" / "microsoft-edge" / "Default"
+            candidates = [base / "Cookies", base / "Network" / "Cookies"]
+    elif browser == "firefox":
+        if system_name == "windows":
+            app_data = Path(os.environ.get("APPDATA") or "")
+            if app_data:
+                profiles = app_data / "Mozilla" / "Firefox" / "Profiles"
+                if profiles.exists():
+                    candidates.extend(profiles.glob("*/cookies.sqlite"))
+        elif system_name == "darwin":
+            profiles = home / "Library" / "Application Support" / "Firefox" / "Profiles"
+            if profiles.exists():
+                candidates.extend(profiles.glob("*/cookies.sqlite"))
+        else:
+            profiles = home / ".mozilla" / "firefox"
+            if profiles.exists():
+                candidates.extend(profiles.glob("*/cookies.sqlite"))
+    else:
+        # Unknown browser token: let yt-dlp handle custom identifiers.
+        return True
+
+    return any(candidate.exists() for candidate in candidates)
+
+
 def _build_ytdlp_common_args() -> List[str]:
     """Build shared yt-dlp args with optional anti-bot/auth settings from env vars."""
     args = [
@@ -329,7 +398,7 @@ def _build_ytdlp_common_args() -> List[str]:
     cookies_from_browser = (os.environ.get("YTDLP_COOKIES_FROM_BROWSER") or "").strip()
     if cookies_file:
         args.extend(["--cookies", cookies_file])
-    elif cookies_from_browser:
+    elif cookies_from_browser and _browser_cookie_db_available(cookies_from_browser):
         args.extend(["--cookies-from-browser", cookies_from_browser])
 
     js_runtimes = (os.environ.get("YTDLP_JS_RUNTIMES") or "node,deno").strip()
