@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Scoring Desk — Video to Music</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Karla:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<div class="grain"></div>
+
+<header class="topbar">
+  <div class="topbar__mark">
+    <span class="topbar__dot"></span>
+    <span class="topbar__wordmark">SCORING DESK</span>
+  </div>
+  <div class="topbar__sub">video&nbsp;analysis&nbsp;&rarr;&nbsp;music&nbsp;match</div>
+</header>
+
+<main class="stage">
+
+  <!-- ============ UPLOAD STATE ============ -->
+  <section id="uploadStage" class="upload-stage">
+    <div class="upload-stage__inner">
+      <p class="eyebrow">01 — INTAKE</p>
+      <h1 class="upload-title">Drop the cut.<br>We'll find its score.</h1>
+      <p class="upload-copy">Upload a video. We'll break it into scenes, read the emotional arc frame by frame, and hand you a music match built around your transitions — not just your mood.</p>
+
+      <label id="dropzone" class="dropzone" for="fileInput">
+        <input type="file" id="fileInput" accept="video/*" hidden />
+        <div class="dropzone__icon" aria-hidden="true">
+          <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+            <path d="M20 5V27" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+            <path d="M11 18L20 27L29 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M6 33H34" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="dropzone__text">
+          <span class="dropzone__main">Choose a video file</span>
+          <span class="dropzone__sub">or drag it here — MP4, MOV, WebM</span>
+        </div>
+      </label>
+
+      <div id="fileChosen" class="file-chosen" hidden>
+        <div class="file-chosen__info">
+          <span class="file-chosen__label">Selected file</span>
+          <span id="fileChosenName" class="file-chosen__name"></span>
+        </div>
+        <button id="analyzeBtn" class="btn-primary">Analyze &amp; score</button>
+      </div>
+
+      <p id="uploadError" class="upload-error" hidden></p>
+    </div>
+  </section>
+
+  <!-- ============ PROCESSING STATE ============ -->
+  <section id="processingStage" class="processing-stage" hidden>
+    <div class="processing-stage__inner">
+      <div class="reel" aria-hidden="true">
+        <div class="reel__hub"></div>
+      </div>
+      <p class="eyebrow">02 — READING THE CUT</p>
+      <h2 id="processingStep" class="processing-step">Extracting frames…</h2>
+      <p class="processing-copy">This runs real scene detection and vision analysis — usually 30–90 seconds depending on length.</p>
+    </div>
+  </section>
+
+  <!-- ============ RESULTS STATE ============ -->
+  <section id="resultsStage" class="results-stage" hidden>
+
+    <div class="results-header">
+      <div>
+        <p class="eyebrow">03 — THE READ</p>
+        <h2 id="overallTheme" class="overall-theme"></h2>
+        <div class="content-tags" id="contentTags"></div>
+      </div>
+      <div class="results-header__meta">
+        <div class="meta-chip"><span class="meta-chip__label">Mood</span><span id="dominantMood" class="meta-chip__value"></span></div>
+        <div class="meta-chip"><span class="meta-chip__label">Pacing</span><span id="pacingValue" class="meta-chip__value"></span></div>
+        <div class="meta-chip"><span class="meta-chip__label">Suggested BPM</span><span id="bpmValue" class="meta-chip__value"></span></div>
+        <div class="meta-chip"><span class="meta-chip__label">Track length</span><span id="idealDurationValue" class="meta-chip__value"></span></div>
+      </div>
+    </div>
+
+    <p class="emotional-arc"><span class="emotional-arc__label">Emotional arc —</span> <span id="emotionalArc"></span></p>
+
+    <!-- Filmstrip timeline: the signature element -->
+    <div class="filmstrip-wrap">
+      <p class="section-label">Scene timeline</p>
+      <div id="filmstrip" class="filmstrip"></div>
+      <div id="sceneDetail" class="scene-detail" hidden>
+        <img id="sceneDetailImg" class="scene-detail__img" alt="" />
+        <div class="scene-detail__text">
+          <p class="scene-detail__time"><span id="sceneDetailTime"></span></p>
+          <p class="scene-detail__mood" id="sceneDetailMood"></p>
+          <p class="scene-detail__desc" id="sceneDetailDesc"></p>
+        </div>
+      </div>
+    </div>
+
+    <div class="panels">
+
+      <!-- Transition moments -->
+      <div class="panel">
+        <p class="section-label">Key transition moments</p>
+        <ul id="transitionList" class="transition-list"></ul>
+      </div>
+
+      <!-- Music recommendation -->
+      <div class="panel panel--music">
+        <p class="section-label">Music match</p>
+
+        <div class="tag-row" id="styleTagRow"></div>
+
+        <p class="music-reasoning" id="musicReasoning"></p>
+
+        <div id="trendingBlock" class="trending-block" hidden>
+          <p class="trending-block__label">Trending now</p>
+          <p id="trendingDirections" class="trending-block__text"></p>
+        </div>
+
+        <div class="cue-sheet">
+          <p class="cue-sheet__title">Section cue sheet</p>
+          <div id="cueSheet" class="cue-sheet__list"></div>
+        </div>
+
+        <div class="prompt-block">
+          <div class="prompt-block__header">
+            <span>Suno / Udio prompt</span>
+            <button id="copyPromptBtn" class="btn-ghost-small">Copy</button>
+          </div>
+          <pre id="sunoPrompt" class="prompt-block__text"></pre>
+        </div>
+
+        <div class="youtube-block">
+          <div class="youtube-tools-row">
+            <p class="section-label">YouTube search queries</p>
+            <button id="stopAllPreviewsBtn" class="btn-ghost-small" type="button" disabled>Stop all previews</button>
+          </div>
+          <div id="youtubeQueries" class="youtube-queries"></div>
+
+          <p class="section-label section-label--sub">Search other music</p>
+          <div class="music-search-row">
+            <input id="musicSearchInput" class="music-search-input" type="text" placeholder="Search songs or instrumentals..." />
+            <button id="musicSearchBtn" class="btn-ghost-small">Search</button>
+          </div>
+          <div id="musicSearchResults" class="youtube-queries"></div>
+
+          <div id="downloadStatus" class="download-status" hidden></div>
+          <div id="downloadOutputs" class="download-outputs"></div>
+        </div>
+      </div>
+
+    </div>
+
+    <button id="startOverBtn" class="btn-secondary start-over">Analyze another video</button>
+
+  </section>
+
+</main>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

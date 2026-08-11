@@ -1,0 +1,23 @@
+# Python environment
+.venv/
+__pycache__/
+*.pyc
+
+# Runtime/generated artifacts
+outputs/
+uploads/
+frames/
+tmp-audio-check/
+
+# Logs and local env
+*.log
+.env
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
+
+# .NET build artifacts
+downloader/**/bin/
+downloader/**/obj/
