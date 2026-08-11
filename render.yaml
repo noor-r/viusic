@@ -11,6 +11,20 @@ services:
         value: https://api.mistral.ai/v1
       - key: DOWNLOADER_FALLBACK_TO_YTDLP
         value: "1"
+      - key: YTDLP_JS_RUNTIMES
+        value: node,deno
+      - key: YTDLP_RETRIES
+        value: "5"
+      - key: YTDLP_FRAGMENT_RETRIES
+        value: "5"
+      - key: YTDLP_EXTRACTOR_RETRIES
+        value: "5"
+      - key: YTDLP_SLEEP_REQUESTS
+        value: "1"
+      - key: YTDLP_COOKIES_B64
+        sync: false
+      - key: YTDLP_COOKIES_FILE
+        sync: false
       - key: ATTACH_DOWNLOAD_AUDIO_ONLY
         value: "1"
       - key: MAX_SCENES_FOR_VISION

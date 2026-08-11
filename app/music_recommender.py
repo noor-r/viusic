@@ -15,7 +15,9 @@ import os
 import re
 import shutil
 import subprocess
+import tempfile
 from concurrent.futures import ThreadPoolExecutor
+from hashlib import sha256
 from pathlib import Path
 from typing import Callable, List, Optional
 
@@ -285,6 +287,30 @@ def _downloader_fallback_enabled() -> bool:
     return os.environ.get("DOWNLOADER_FALLBACK_TO_YTDLP", "1").strip().lower() in {"1", "true", "yes"}
 
 
+def _resolve_ytdlp_cookies_file() -> str:
+    """Resolve cookies source for yt-dlp from file path or env content."""
+    cookies_file = (os.environ.get("YTDLP_COOKIES_FILE") or "").strip()
+    if cookies_file:
+        return cookies_file
+
+    # Support base64-encoded cookie payload for PaaS environments.
+    cookies_b64 = (os.environ.get("YTDLP_COOKIES_B64") or "").strip()
+    if cookies_b64:
+        try:
+            import base64
+
+            cookie_text = base64.b64decode(cookies_b64).decode("utf-8")
+        except Exception:
+            return ""
+
+        digest = sha256(cookies_b64.encode("utf-8")).hexdigest()[:12]
+        cookie_path = Path(tempfile.gettempdir()) / f"yt-dlp-cookies-{digest}.txt"
+        cookie_path.write_text(cookie_text, encoding="utf-8")
+        return str(cookie_path)
+
+    return ""
+
+
 def _build_ytdlp_common_args() -> List[str]:
     """Build shared yt-dlp args with optional anti-bot/auth settings from env vars."""
     args = [
@@ -299,14 +325,14 @@ def _build_ytdlp_common_args() -> List[str]:
         os.environ.get("YTDLP_SLEEP_REQUESTS", "1"),
     ]
 
-    cookies_file = (os.environ.get("YTDLP_COOKIES_FILE") or "").strip()
+    cookies_file = _resolve_ytdlp_cookies_file()
     cookies_from_browser = (os.environ.get("YTDLP_COOKIES_FROM_BROWSER") or "").strip()
     if cookies_file:
         args.extend(["--cookies", cookies_file])
     elif cookies_from_browser:
         args.extend(["--cookies-from-browser", cookies_from_browser])
 
-    js_runtimes = (os.environ.get("YTDLP_JS_RUNTIMES") or "").strip()
+    js_runtimes = (os.environ.get("YTDLP_JS_RUNTIMES") or "node,deno").strip()
     if js_runtimes:
         args.extend(["--js-runtimes", js_runtimes])
 

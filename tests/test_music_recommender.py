@@ -1,6 +1,7 @@
 import unittest
 from unittest.mock import Mock, patch
 import os
+import base64
 
 from app.music_recommender import (
     build_music_search_queries,
@@ -146,6 +147,53 @@ class DownloadFallbackTests(unittest.TestCase):
         self.assertIn("chrome", command)
         self.assertIn("--js-runtimes", command)
         self.assertIn("node,deno", command)
+
+    @patch("app.music_recommender.subprocess.run")
+    @patch("app.music_recommender._ensure_downloader_path")
+    @patch("app.music_recommender.Path.exists")
+    def test_ytdlp_uses_default_js_runtime_when_env_is_missing(self, exists_mock, ensure_mock, run_mock):
+        ensure_mock.side_effect = RuntimeError("downloader missing")
+        exists_mock.return_value = True
+        run_mock.return_value = Mock(returncode=0, stderr="", stdout="")
+
+        with patch.dict(
+            os.environ,
+            {
+                "YTDLP_JS_RUNTIMES": "",
+                "YTDLP_COOKIES_FROM_BROWSER": "",
+                "YTDLP_COOKIES_FILE": "",
+                "YTDLP_COOKIES_B64": "",
+            },
+            clear=False,
+        ):
+            download_media_with_downloader("https://youtube.com/watch?v=abc123", "outputs/test_track.mp3")
+
+        command = run_mock.call_args.args[0]
+        self.assertIn("--js-runtimes", command)
+        self.assertIn("node,deno", command)
+
+    @patch("app.music_recommender.subprocess.run")
+    @patch("app.music_recommender._ensure_downloader_path")
+    @patch("app.music_recommender.Path.exists")
+    def test_ytdlp_uses_cookies_b64_when_cookie_file_not_set(self, exists_mock, ensure_mock, run_mock):
+        ensure_mock.side_effect = RuntimeError("downloader missing")
+        exists_mock.return_value = True
+        run_mock.return_value = Mock(returncode=0, stderr="", stdout="")
+        cookies_payload = "# Netscape HTTP Cookie File\n.youtube.com\tTRUE\t/\tTRUE\t2147483647\tSID\ttest"
+
+        with patch.dict(
+            os.environ,
+            {
+                "YTDLP_COOKIES_FILE": "",
+                "YTDLP_COOKIES_FROM_BROWSER": "",
+                "YTDLP_COOKIES_B64": base64.b64encode(cookies_payload.encode("utf-8")).decode("utf-8"),
+            },
+            clear=False,
+        ):
+            download_media_with_downloader("https://youtube.com/watch?v=abc123", "outputs/test_track.mp3")
+
+        command = run_mock.call_args.args[0]
+        self.assertIn("--cookies", command)
 
 
 if __name__ == "__main__":
