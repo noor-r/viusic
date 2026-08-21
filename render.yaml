@@ -13,6 +13,8 @@ services:
         value: "1"
       - key: YTDLP_JS_RUNTIMES
         value: node
+      - key: YTDLP_REMOTE_COMPONENTS
+        value: ejs:github
       - key: YTDLP_RETRIES
         value: "5"
       - key: YTDLP_FRAGMENT_RETRIES
@@ -20,7 +22,7 @@ services:
       - key: YTDLP_EXTRACTOR_RETRIES
         value: "5"
       - key: YTDLP_SLEEP_REQUESTS
-        value: "1"
+        value: "3"
       - key: YTDLP_COOKIES_B64
         sync: false
       - key: YTDLP_COOKIES_FILE
