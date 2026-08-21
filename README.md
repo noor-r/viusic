@@ -73,7 +73,7 @@ export YTDLP_COOKIES_FROM_BROWSER=chrome
 export YTDLP_COOKIES_FILE=/absolute/path/to/youtube-cookies.txt
 
 # Optional: enable additional JavaScript runtimes for YouTube extraction
-export YTDLP_JS_RUNTIMES=node,deno
+export YTDLP_JS_RUNTIMES=node
 ```
 
 Optional retry/throttle tuning:

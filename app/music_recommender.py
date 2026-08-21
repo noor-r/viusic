@@ -401,15 +401,31 @@ def _build_ytdlp_common_args() -> List[str]:
     elif cookies_from_browser and _browser_cookie_db_available(cookies_from_browser):
         args.extend(["--cookies-from-browser", cookies_from_browser])
 
-    js_runtimes = (os.environ.get("YTDLP_JS_RUNTIMES") or "node,deno").strip()
-    if js_runtimes:
-        args.extend(["--js-runtimes", js_runtimes])
+    js_runtime = _resolve_ytdlp_js_runtime()
+    if js_runtime:
+        args.extend(["--js-runtimes", js_runtime])
 
     user_agent = (os.environ.get("YTDLP_USER_AGENT") or "").strip()
     if user_agent:
         args.extend(["--user-agent", user_agent])
 
     return args
+
+
+def _resolve_ytdlp_js_runtime() -> str:
+    """Return a single supported JS runtime token for broad yt-dlp compatibility."""
+    raw_value = (os.environ.get("YTDLP_JS_RUNTIMES") or "node").strip()
+    if not raw_value:
+        return "node"
+
+    # Accept comma and whitespace-separated values, but pass one runtime to yt-dlp.
+    requested = [token.strip().lower() for token in re.split(r"[,\s]+", raw_value) if token.strip()]
+    supported = {"node", "deno", "bun", "quickjs"}
+    for runtime in requested:
+        if runtime in supported:
+            return runtime
+
+    return "node"
 
 
 def _download_media_with_ytdlp(video_url: str, output_path: str) -> str:
