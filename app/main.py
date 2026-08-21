@@ -495,11 +495,13 @@ async def get_output_file(job_id: str, filename: str, download: bool = False):
 
 
 @app.get("/health")
+@app.head("/health")
 async def health():
     return {"status": "ok"}
 
 
 @app.get("/")
+@app.head("/")
 async def root():
     return FileResponse(STATIC_DIR / "index.html")
 
