@@ -3,4 +3,4 @@ uvicorn[standard]==0.32.1
 openai==1.99.9
 python-multipart==0.0.17
 numpy==2.5.1
-yt-dlp
+yt-dlp[default]

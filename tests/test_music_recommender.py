@@ -148,7 +148,11 @@ class DownloadFallbackTests(unittest.TestCase):
         self.assertIn("--cookies-from-browser", command)
         self.assertIn("chrome", command)
         self.assertIn("--js-runtimes", command)
-        self.assertIn("node,deno", command)
+        js_runtime = command[command.index("--js-runtimes") + 1]
+        self.assertTrue(js_runtime == "node" or js_runtime.startswith("node:"))
+        self.assertNotIn("node,deno", command)
+        self.assertIn("--remote-components", command)
+        self.assertIn("ejs:github", command)
 
     @patch("app.music_recommender.subprocess.run")
     @patch("app.music_recommender._ensure_downloader_path")
@@ -172,7 +176,8 @@ class DownloadFallbackTests(unittest.TestCase):
 
         command = run_mock.call_args.args[0]
         self.assertIn("--js-runtimes", command)
-        self.assertIn("node,deno", command)
+        js_runtime = command[command.index("--js-runtimes") + 1]
+        self.assertTrue(js_runtime == "node" or js_runtime.startswith("node:"))
 
     @patch("app.music_recommender.subprocess.run")
     @patch("app.music_recommender._ensure_downloader_path")
