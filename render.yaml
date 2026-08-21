@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: video-music-analyzer
+    name: viusic
     runtime: docker
     dockerfilePath: ./Dockerfile
     autoDeploy: true
@@ -12,7 +12,7 @@ services:
       - key: DOWNLOADER_FALLBACK_TO_YTDLP
         value: "1"
       - key: YTDLP_JS_RUNTIMES
-        value: node,deno
+        value: node
       - key: YTDLP_RETRIES
         value: "5"
       - key: YTDLP_FRAGMENT_RETRIES
