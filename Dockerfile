@@ -43,7 +43,8 @@ COPY downloader ./downloader
 COPY README.md ./README.md
 COPY --from=downloader-build /publish /app/tools/soundmind
 
-ENV DOWNLOADER_FALLBACK_TO_YTDLP=1 \
+ENV DOWNLOADER_FALLBACK_TO_YTDLP=0 \
+    DOWNLOADER_FALLBACK_ON_ERROR=0 \
     ATTACH_DOWNLOAD_AUDIO_ONLY=1 \
     YTDLP_JS_RUNTIMES=node \
     YTDLP_REMOTE_COMPONENTS=ejs:github \

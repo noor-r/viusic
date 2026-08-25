@@ -497,7 +497,13 @@ async def get_output_file(job_id: str, filename: str, download: bool = False):
 @app.get("/health")
 @app.head("/health")
 async def health():
-    return {"status": "ok"}
+    soundmind = mr._resolve_downloader_path()
+    return {
+        "status": "ok",
+        "soundmind_downloader": soundmind or "",
+        "ytdlp_fallback_if_missing": mr._downloader_fallback_enabled(),
+        "ytdlp_fallback_on_error": mr._downloader_fallback_on_error_enabled(),
+    }
 
 
 @app.get("/")

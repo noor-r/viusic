@@ -11,6 +11,7 @@ Wire your existing YouTube search feature into `set_youtube_search_function`.
 """
 
 import json
+import logging
 import os
 import platform
 import re
@@ -25,6 +26,8 @@ from typing import Callable, List, Optional
 from openai import OpenAI
 
 from .json_utils import safe_json_object
+
+logger = logging.getLogger(__name__)
 
 def resolve_model() -> str:
     if os.environ.get("KIMI_TEXT_MODEL"):
@@ -299,7 +302,33 @@ def _search_with_ytdlp(query: str) -> List[dict]:
 
 
 def _downloader_fallback_enabled() -> bool:
+    """Use yt-dlp only when SoundMind cannot be resolved (binary missing)."""
     return os.environ.get("DOWNLOADER_FALLBACK_TO_YTDLP", "1").strip().lower() in {"1", "true", "yes"}
+
+
+def _downloader_fallback_on_error_enabled() -> bool:
+    """Opt-in: after SoundMind runs and fails, retry with yt-dlp.
+
+    Default is off so Render does not hide SoundMind failures behind yt-dlp
+    cookie/bot errors.
+    """
+    return os.environ.get("DOWNLOADER_FALLBACK_ON_ERROR", "0").strip().lower() in {"1", "true", "yes"}
+
+
+def _soundmind_command(downloader_path: str, *args: str) -> List[str]:
+    command = [downloader_path, *args]
+    if downloader_path.endswith(".dll"):
+        dotnet_path = _resolve_dotnet_path()
+        if not dotnet_path:
+            raise RuntimeError("dotnet CLI was not found. Install .NET SDK to run the downloader project.")
+        command = [dotnet_path, downloader_path, *args]
+    return command
+
+
+def _soundmind_failure_message(completed: subprocess.CompletedProcess, action: str) -> str:
+    stderr = (completed.stderr or completed.stdout or "").strip()
+    detail = stderr or f"exit code {completed.returncode}"
+    return f"SoundMind.Downloader {action} failed: {detail}"
 
 
 def _resolve_ytdlp_cookies_file() -> str:
@@ -501,31 +530,33 @@ def search_with_downloader(query: str) -> List[dict]:
     """Search YouTube via the bundled C# downloader executable."""
     downloader_path = _resolve_downloader_path()
     if not downloader_path:
-        return _search_with_ytdlp(query)
+        if _downloader_fallback_enabled():
+            logger.warning("SoundMind.Downloader not found; falling back to yt-dlp search")
+            return _search_with_ytdlp(query)
+        raise RuntimeError(
+            "SoundMind.Downloader was not found. Set SOUNDMIND_DOWNLOADER_PATH or build the downloader."
+        )
 
-    command = [downloader_path, "search", query]
-    if downloader_path.endswith(".dll"):
-        dotnet_path = _resolve_dotnet_path()
-        if not dotnet_path:
-            raise RuntimeError("dotnet CLI was not found. Install .NET SDK to run the downloader project.")
-        command = [dotnet_path, downloader_path, "search", query]
-
+    command = _soundmind_command(downloader_path, "search", query)
+    logger.info("Searching with SoundMind.Downloader: %s", downloader_path)
     completed = subprocess.run(command, capture_output=True, text=True, check=False, timeout=180)
     if completed.returncode != 0:
-        if _downloader_fallback_enabled():
+        message = _soundmind_failure_message(completed, "search")
+        if _downloader_fallback_on_error_enabled():
+            logger.warning("%s; falling back to yt-dlp", message)
             return _search_with_ytdlp(query)
-        stderr = (completed.stderr or completed.stdout).strip()
-        raise RuntimeError(stderr or f"Downloader failed with exit code {completed.returncode}")
+        raise RuntimeError(message)
 
     try:
         payload = json.loads(completed.stdout.strip())
     except json.JSONDecodeError as exc:
-        raise RuntimeError(f"Downloader returned invalid JSON: {completed.stdout[:200]}") from exc
+        raise RuntimeError(f"SoundMind.Downloader returned invalid JSON: {completed.stdout[:200]}") from exc
 
     normalized = normalize_downloader_results(payload)
     if normalized:
         return normalized
-    if _downloader_fallback_enabled():
+    if _downloader_fallback_on_error_enabled():
+        logger.warning("SoundMind.Downloader search returned no results; falling back to yt-dlp")
         return _search_with_ytdlp(query)
     return normalized
 
@@ -540,25 +571,21 @@ def download_media_with_downloader(video_url: str, output_path: str) -> str:
     """Download a YouTube URL to a media file using the bundled C# downloader."""
     try:
         downloader_path = _ensure_downloader_path()
-    except Exception:
+    except Exception as exc:
         if _downloader_fallback_enabled():
+            logger.warning("SoundMind.Downloader unavailable (%s); falling back to yt-dlp", exc)
             return _download_media_with_ytdlp(video_url, output_path)
         raise
 
-    command = [downloader_path, video_url, output_path]
-    if downloader_path.endswith(".dll"):
-        dotnet_path = _resolve_dotnet_path()
-        if not dotnet_path:
-            raise RuntimeError("dotnet CLI was not found. Install .NET SDK to run the downloader project.")
-        command = [dotnet_path, downloader_path, video_url, output_path]
-
+    command = _soundmind_command(downloader_path, video_url, output_path)
+    logger.info("Downloading with SoundMind.Downloader: %s", downloader_path)
     completed = subprocess.run(command, capture_output=True, text=True, check=False, timeout=600)
     if completed.returncode != 0:
-        if _downloader_fallback_enabled():
+        message = _soundmind_failure_message(completed, "download")
+        if _downloader_fallback_on_error_enabled():
+            logger.warning("%s; falling back to yt-dlp", message)
             return _download_media_with_ytdlp(video_url, output_path)
-
-        stderr = (completed.stderr or completed.stdout).strip()
-        raise RuntimeError(stderr or f"Downloader failed with exit code {completed.returncode}")
+        raise RuntimeError(message)
 
     return output_path
 

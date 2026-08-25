@@ -103,7 +103,8 @@ class DownloadFallbackTests(unittest.TestCase):
         exists_mock.return_value = True
         run_mock.return_value = Mock(returncode=0, stderr="", stdout="")
 
-        output = download_media_with_downloader("https://youtube.com/watch?v=abc123", "outputs/test_track.mp3")
+        with patch.dict(os.environ, {"DOWNLOADER_FALLBACK_TO_YTDLP": "1"}, clear=False):
+            output = download_media_with_downloader("https://youtube.com/watch?v=abc123", "outputs/test_track.mp3")
 
         self.assertEqual(output, os.path.normpath("outputs/test_track.mp3"))
         self.assertEqual(run_mock.call_count, 1)
@@ -112,7 +113,22 @@ class DownloadFallbackTests(unittest.TestCase):
     @patch("app.music_recommender.subprocess.run")
     @patch("app.music_recommender._ensure_downloader_path")
     @patch("app.music_recommender.Path.exists")
-    def test_uses_ytdlp_when_downloader_command_fails(self, exists_mock, ensure_mock, run_mock):
+    def test_does_not_fallback_to_ytdlp_when_downloader_command_fails(self, exists_mock, ensure_mock, run_mock):
+        ensure_mock.return_value = "SoundMind.Downloader.exe"
+        exists_mock.return_value = True
+        run_mock.return_value = Mock(returncode=1, stderr="downloader failed", stdout="")
+
+        with patch.dict(os.environ, {"DOWNLOADER_FALLBACK_ON_ERROR": "0"}, clear=False):
+            with self.assertRaisesRegex(RuntimeError, "SoundMind.Downloader download failed"):
+                download_media_with_downloader("https://youtube.com/watch?v=abc123", "outputs/test_track.mp4")
+
+        self.assertEqual(run_mock.call_count, 1)
+        self.assertIn("SoundMind.Downloader.exe", run_mock.call_args.args[0][0])
+
+    @patch("app.music_recommender.subprocess.run")
+    @patch("app.music_recommender._ensure_downloader_path")
+    @patch("app.music_recommender.Path.exists")
+    def test_uses_ytdlp_when_downloader_command_fails_if_fallback_on_error(self, exists_mock, ensure_mock, run_mock):
         ensure_mock.return_value = "SoundMind.Downloader.exe"
         exists_mock.return_value = True
         run_mock.side_effect = [
@@ -120,7 +136,8 @@ class DownloadFallbackTests(unittest.TestCase):
             Mock(returncode=0, stderr="", stdout=""),
         ]
 
-        output = download_media_with_downloader("https://youtube.com/watch?v=abc123", "outputs/test_track.mp4")
+        with patch.dict(os.environ, {"DOWNLOADER_FALLBACK_ON_ERROR": "1"}, clear=False):
+            output = download_media_with_downloader("https://youtube.com/watch?v=abc123", "outputs/test_track.mp4")
 
         self.assertEqual(output, os.path.normpath("outputs/test_track.mp4"))
         self.assertEqual(run_mock.call_count, 2)

@@ -12,7 +12,9 @@ services:
       - key: SOUNDMIND_DOWNLOADER_PATH
         value: /app/tools/soundmind/SoundMind.Downloader
       - key: DOWNLOADER_FALLBACK_TO_YTDLP
-        value: "1"
+        value: "0"
+      - key: DOWNLOADER_FALLBACK_ON_ERROR
+        value: "0"
       - key: YTDLP_JS_RUNTIMES
         value: node
       - key: YTDLP_REMOTE_COMPONENTS

@@ -62,7 +62,7 @@ try
     if (ffmpegPath is null)
     {
         ffmpegPath = Path.Combine(AppContext.BaseDirectory, FFmpeg.CliFileName);
-        Console.WriteLine("FFmpeg was not found; downloading it for the local downloader...");
+    Console.Error.WriteLine("FFmpeg was not found; downloading it for the local downloader...");
         await FFmpeg.DownloadAsync(ffmpegPath);
     }
 
