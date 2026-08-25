@@ -9,11 +9,15 @@ using YoutubeExplode.Common;
 using YoutubeExplode.Videos;
 using YoutubeExplode.Videos.Streams;
 
+var cookies = YoutubeCookieLoader.LoadFromEnvironment();
+if (cookies.Count > 0)
+    Console.Error.WriteLine($"Loaded {cookies.Count} YouTube cookie(s) for SoundMind.Downloader.");
+
 if (args.Length == 2 && args[0].Equals("search", StringComparison.OrdinalIgnoreCase))
 {
     try
     {
-        using var resolver = new QueryResolver();
+        using var resolver = new QueryResolver(cookies);
         var search = await resolver.ResolveAsync($"?{args[1]}");
         var results = search.Videos.Take(5).Select(video => new
         {
@@ -62,7 +66,7 @@ try
     if (ffmpegPath is null)
     {
         ffmpegPath = Path.Combine(AppContext.BaseDirectory, FFmpeg.CliFileName);
-    Console.Error.WriteLine("FFmpeg was not found; downloading it for the local downloader...");
+        Console.Error.WriteLine("FFmpeg was not found; downloading it for the local downloader...");
         await FFmpeg.DownloadAsync(ffmpegPath);
     }
 
@@ -70,10 +74,10 @@ try
     if (!string.IsNullOrWhiteSpace(outputDirectory))
         Directory.CreateDirectory(outputDirectory);
 
-    var youtube = new YoutubeClient();
+    var youtube = new YoutubeClient(YoutubeDownloader.Core.Utils.Http.Client, cookies);
     var video = await youtube.Videos.GetAsync(videoId);
 
-    using var downloader = new VideoDownloader();
+    using var downloader = new VideoDownloader(cookies);
     var preference = outputExtension == ".mp3"
         ? new VideoDownloadPreference(Container.Mp3, VideoQualityPreference.Lowest)
         : new VideoDownloadPreference(Container.Mp4, VideoQualityPreference.Lowest);
