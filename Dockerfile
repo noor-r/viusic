@@ -24,9 +24,14 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1
 
-# ffmpeg for media; Node 22+ for optional yt-dlp EJS fallback.
+# ffmpeg for media; libicu for .NET globalization; Node 22+ for optional yt-dlp EJS.
+# Soft-install whichever libicuN package the base image provides.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates curl ffmpeg gnupg \
+    && (apt-get install -y --no-install-recommends libicu76 \
+        || apt-get install -y --no-install-recommends libicu74 \
+        || apt-get install -y --no-install-recommends libicu72 \
+        || true) \
     && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
     && rm -rf /var/lib/apt/lists/*
@@ -49,6 +54,7 @@ ENV DOWNLOADER_FALLBACK_TO_YTDLP=0 \
     YTDLP_JS_RUNTIMES=node \
     YTDLP_REMOTE_COMPONENTS=ejs:github \
     SOUNDMIND_DOWNLOADER_PATH=/app/tools/soundmind/SoundMind.Downloader \
+    DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1 \
     PATH="/app/tools/soundmind:${PATH}"
 
 CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
