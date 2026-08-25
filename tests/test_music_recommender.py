@@ -6,6 +6,7 @@ from pathlib import Path
 
 from app.music_recommender import (
     _build_ytdlp_common_args,
+    _resolve_downloader_path,
     build_music_search_queries,
     build_recommended_music_candidates,
     download_media_with_downloader,
@@ -217,6 +218,17 @@ class DownloadFallbackTests(unittest.TestCase):
                     args = _build_ytdlp_common_args()
 
         self.assertNotIn("--cookies-from-browser", args)
+
+    def test_resolves_soundmind_path_from_env(self):
+        with patch.dict(
+            os.environ,
+            {"SOUNDMIND_DOWNLOADER_PATH": "/app/tools/soundmind/SoundMind.Downloader"},
+            clear=False,
+        ):
+            with patch("app.music_recommender.Path.is_file", return_value=True):
+                resolved = _resolve_downloader_path()
+
+        self.assertEqual(Path(resolved), Path("/app/tools/soundmind/SoundMind.Downloader"))
 
 
 if __name__ == "__main__":

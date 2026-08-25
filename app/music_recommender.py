@@ -110,15 +110,22 @@ def _discover_downloader_artifact(base_dir: Path) -> Optional[str]:
         project_dir / "bin" / "Debug" / "net10.0" / "SoundMind.Downloader.dll",
         project_dir / "bin" / "Release" / "net10.0" / "SoundMind.Downloader.exe",
         project_dir / "bin" / "Release" / "net10.0" / "SoundMind.Downloader.dll",
+        project_dir / "bin" / "Release" / "net10.0" / "linux-x64" / "SoundMind.Downloader",
+        project_dir / "bin" / "Release" / "net10.0" / "linux-x64" / "publish" / "SoundMind.Downloader",
+        Path("/app/tools/soundmind/SoundMind.Downloader"),
     ]
     for candidate in candidates:
-        if candidate.exists():
+        if candidate.is_file():
             return str(candidate)
 
     # Support alternate target frameworks/configurations by scanning bin outputs.
     discovered: list[Path] = []
-    for pattern in ("bin/**/SoundMind.Downloader.exe", "bin/**/SoundMind.Downloader.dll"):
-        discovered.extend(project_dir.glob(pattern))
+    for pattern in (
+        "bin/**/SoundMind.Downloader.exe",
+        "bin/**/SoundMind.Downloader.dll",
+        "bin/**/SoundMind.Downloader",
+    ):
+        discovered.extend(path for path in project_dir.glob(pattern) if path.is_file())
 
     if discovered:
         best = max(discovered, key=lambda path: path.stat().st_mtime)
@@ -129,6 +136,12 @@ def _discover_downloader_artifact(base_dir: Path) -> Optional[str]:
 
 def _resolve_downloader_path() -> Optional[str]:
     """Locate the bundled SoundMind downloader executable or DLL."""
+    env_path = (os.environ.get("SOUNDMIND_DOWNLOADER_PATH") or "").strip()
+    if env_path:
+        candidate = Path(env_path)
+        if candidate.is_file():
+            return str(candidate)
+
     bundled = _discover_downloader_artifact(_downloader_base_dir())
     if bundled:
         return bundled
@@ -153,9 +166,10 @@ def _resolve_dotnet_path() -> Optional[str]:
 
     dotnet_root = os.environ.get("DOTNET_ROOT")
     if dotnet_root:
-        candidate = Path(dotnet_root) / "dotnet.exe"
-        if candidate.exists():
-            return str(candidate)
+        for name in ("dotnet", "dotnet.exe"):
+            candidate = Path(dotnet_root) / name
+            if candidate.exists():
+                return str(candidate)
 
     return None
 

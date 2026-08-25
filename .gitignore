@@ -17,6 +17,8 @@ tmp-audio-check/
 .DS_Store
 Thumbs.db
 .vscode/
+.cursor/
+.tmp/
 
 # .NET build artifacts
 downloader/**/bin/

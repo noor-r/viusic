@@ -9,6 +9,8 @@ services:
         sync: false
       - key: MISTRAL_API_BASE_URL
         value: https://api.mistral.ai/v1
+      - key: SOUNDMIND_DOWNLOADER_PATH
+        value: /app/tools/soundmind/SoundMind.Downloader
       - key: DOWNLOADER_FALLBACK_TO_YTDLP
         value: "1"
       - key: YTDLP_JS_RUNTIMES
